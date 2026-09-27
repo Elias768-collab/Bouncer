@@ -15,3 +15,15 @@
 - Attached the generated client key to the Express request.
 - Tested client identification successfully through the root endpoint.
 - Initialized Git with `main` as the primary branch.
+
+## 2026-09-27
+
+### Fixed-Window Rate Limiting
+
+- Added guest rate-limit configuration of 10 requests per 60 seconds.
+- Implemented the first version of the rate limiter middleware.
+- Added Redis `INCR` for request counting.
+- Added Redis `EXPIRE` to control the fixed request window.
+- Added HTTP 429 responses when the request limit is exceeded.
+- Connected client identification and rate-limiting middleware.
+- Tested successfully: the 11th request is blocked after 10 allowed requests.
