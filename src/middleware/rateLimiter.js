@@ -1,5 +1,6 @@
 import { redisClient } from "../redis/client.js";
 import { rateLimits } from "../config/limits.js";
+import { setRateLimitHeaders } from "../utils/responseHeader.js";
 
 export const rateLimiter = async (req, res, next) => {
     const clientKey = req.clientKey;
@@ -14,9 +15,21 @@ export const rateLimiter = async (req, res, next) => {
             await redisClient.expire(redisKey, limit.window);
         }
 
+        const ttl = await redisClient.ttl(redisKey);
+
+        setRateLimitHeaders(
+            res,
+            limit.requests,
+            requestCount,
+            ttl
+        );
+
         if (requestCount > limit.requests) {
+            // Tell the client how many seconds it should wait before retrying.
+            res.set("Retry-After", ttl);
+
             return res.status(429).json({
-                message: "Too many requests. please try again after 60 seconds"
+                message: "Too many requests. please try again later"
             });
         }
  

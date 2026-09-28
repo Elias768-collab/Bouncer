@@ -27,3 +27,16 @@
 - Added HTTP 429 responses when the request limit is exceeded.
 - Connected client identification and rate-limiting middleware.
 - Tested successfully: the 11th request is blocked after 10 allowed requests.
+
+## 2026-9-28
+
+### Rate-Limit Response Headers
+
+- Added `X-RateLimit-Limit` response header.
+- Added `X-RateLimit-Remaining` response header.
+- Added `X-RateLimit-Reset` response header.
+- Added `Retry-After` header for blocked requests.
+- Created a reusable `setRateLimitHeaders` utility.
+- Used Redis TTL to calculate the remaining rate-limit window.
+- Tested rate-limit headers successfully with `curl`.
+- Verified HTTP 429 responses include retry information.
