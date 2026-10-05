@@ -40,3 +40,50 @@
 - Used Redis TTL to calculate the remaining rate-limit window.
 - Tested rate-limit headers successfully with `curl`.
 - Verified HTTP 429 responses include retry information.
+
+
+## 2026-10-2
+## Week 2: Sliding Window Rate Limiting
+
+### Added
+
+* Implemented the sliding-window rate limiting algorithm using Redis Sorted Sets.
+* Added `src/algorithms/slidingWindow.js` to connect the Node.js application to the Redis Lua script.
+* Added `src/scripts/slidingWindow.lua` to perform the rate-limit operation atomically inside Redis.
+* Added unique request IDs using `randomUUID()` so multiple requests can be stored even when they occur within the same second.
+* Added sliding-window-aware `X-RateLimit-Reset` calculation based on the oldest request currently inside the window.
+* Added accurate `Retry-After` calculation based on when the oldest request will leave the sliding window.
+
+### Changed
+
+* Replaced the fixed-window `INCR + EXPIRE` logic in `rateLimiter.js` with the sliding-window algorithm.
+* Rate-limit headers are now calculated from the current sliding-window state.
+* `rateLimiter.js` now receives the request allowance, current request count, and reset timestamp from the sliding-window algorithm.
+
+### Implementation
+
+* Redis Sorted Sets store request timestamps as scores.
+* Expired requests are removed with `ZREMRANGEBYSCORE`.
+* Current requests are counted with `ZCARD`.
+* New requests are recorded with `ZADD`.
+* Redis key expiration is maintained with `EXPIRE`.
+* Lua ensures the check-and-record operation happens atomically.
+
+### Testing
+
+* Confirmed requests within the configured 10-request window are allowed.
+* Confirmed the 11th request receives `HTTP 429 Too Many Requests`.
+* Confirmed `X-RateLimit-Remaining` decreases correctly from 9 to 0.
+* Confirmed `X-RateLimit-Reset` identifies when the oldest request leaves the window.
+* Confirmed `Retry-After` reports the remaining wait time instead of always returning the full 60-second window.
+* Confirmed requests become available again as older requests leave the sliding window.
+
+### Milestone Status
+
+**Completed:** Core sliding-window rate limiting is working and manually tested successfully.
+
+### Next
+
+* Add authenticated client identification using JWT/user IDs.
+* Apply different rate limits for guest, free, and premium clients.
+* Add automated tests and concurrent load testing.

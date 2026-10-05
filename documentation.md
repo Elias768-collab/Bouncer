@@ -41,3 +41,27 @@ The Redis client is initialized as a shared client in:
 The project is being developed incrementally.
 
 The current focus is establishing the infrastructure and request flow before implementing the actual rate-limiting algorithms.
+
+Bouncer was upgraded from a fixed-window counter to a sliding-window rate limiter.
+
+The sliding-window implementation uses a Redis Sorted Set to store individual requests for each client.
+
+Each request:
+- uses the client key as the Redis key
+- uses the current Unix timestamp as the Sorted Set score
+- receives a unique request ID as the Sorted Set member
+
+Before counting requests, the Lua script removes requests that have fallen outside the current time window.
+
+The Lua script then:
+1. Removes expired requests.
+2. Counts requests remaining in the window.
+3. Rejects the request if the configured limit has been reached.
+4. Otherwise records the new request.
+5. Returns the request count and the timestamp when the oldest request will leave the window.
+
+Lua is used so the check-and-record operation happens atomically inside Redis, preventing race conditions between concurrent requests.
+
+Rate-limit response headers are calculated from the sliding-window state. Retry-After is based on when the oldest request will expire rather than always returning the full window duration.
+
+The implementation was tested manually by sending requests to the protected endpoint. Ten requests were accepted, the eleventh was rejected with HTTP 429, and requests became available again as older requests left the sliding window.

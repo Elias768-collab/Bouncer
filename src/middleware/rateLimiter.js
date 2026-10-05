@@ -1,39 +1,49 @@
-import { redisClient } from "../redis/client.js";
 import { rateLimits } from "../config/limits.js";
-import { setRateLimitHeaders } from "../utils/responseHeader.js";
+import { slidingWindow } from "../algorithms/slidingWindow.js";
+// import { setRateLimitHeaders } from "../utils/responseHeader.js";
 
 export const rateLimiter = async (req, res, next) => {
     const clientKey = req.clientKey;
     const limit = rateLimits.guest;
 
-    const redisKey = `rate-limit:${clientKey}`;
-
     try {
-        const requestCount = await redisClient.incr(redisKey);
-
-        if (requestCount === 1) {
-            await redisClient.expire(redisKey, limit.window);
-        }
-
-        const ttl = await redisClient.ttl(redisKey);
-
-        setRateLimitHeaders(
-            res,
+        const result = await slidingWindow(
+            clientKey,
             limit.requests,
-            requestCount,
-            ttl
+            limit.window
         );
 
-        if (requestCount > limit.requests) {
-            // Tell the client how many seconds it should wait before retrying.
-            res.set("Retry-After", ttl);
+        const { allowed, requestCount, resetAt } = result;
+
+        const remaining = Math.max(
+            limit.requests - requestCount,
+            0
+        );
+
+        // Tell the client the maximum number of requests allowed.
+        res.set("X-RateLimit-Limit", limit.requests);
+
+        // Tell the client how many requests remain.
+        res.set("X-RateLimit-Remaining", remaining);
+
+        // Tell the client when the oldest request leaves the window.
+        res.set("X-RateLimit-Reset", resetAt);
+
+        if (!allowed) {
+            // Calculate how many seconds until the oldest request expires.
+            const retryAfter = Math.max(
+                resetAt - Math.floor(Date.now() / 1000),
+                0
+            );
+
+            res.set("Retry-After", retryAfter);
 
             return res.status(429).json({
-                message: "Too many requests. please try again later"
+                message: "Too many requests. Please try again later."
             });
         }
- 
-        next()
+
+        next();
     } catch (error) {
         console.error("Rate limiter error:", error);
         next(error);
