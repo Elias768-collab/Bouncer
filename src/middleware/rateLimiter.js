@@ -1,10 +1,17 @@
 import { rateLimits } from "../config/limits.js";
 import { slidingWindow } from "../algorithms/slidingWindow.js";
-// import { setRateLimitHeaders } from "../utils/responseHeader.js";
+
 
 export const rateLimiter = async (req, res, next) => {
     const clientKey = req.clientKey;
-    const limit = rateLimits.guest;
+    const limit = rateLimits[req.clientTier];
+
+    // Ensure the client has a valid configured tier
+    if (!limit) {
+        return res.status(500).json({
+            message: "Rate limit configuration error."
+        });
+    }
 
     try {
         const result = await slidingWindow(

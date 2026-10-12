@@ -43,7 +43,7 @@
 
 
 ## 2026-10-2
-## Week 2: Sliding Window Rate Limiting
+## Sliding Window Rate Limiting
 
 ### Added
 
@@ -84,6 +84,44 @@
 
 ### Next
 
-* Add authenticated client identification using JWT/user IDs.
-* Apply different rate limits for guest, free, and premium clients.
-* Add automated tests and concurrent load testing.
+* Add automated tests for guest, authenticated, and invalid-token scenarios.
+* Test concurrent requests against the sliding-window implementation.
+* Review robustness, configuration validation, and deployment readiness.
+
+## 2026-10-12
+
+### JWT Authentication and Tier-Based Rate Limiting
+
+#### Added
+- Installed `jsonwebtoken` for JWT verification.
+- Added `src/middleware/verifyToken.js` to validate bearer tokens separately from client identification.
+- Added authenticated client identification using verified JWT subject (`sub`) claims.
+- Added support for `guest`, `free`, and `premium` rate-limit tiers.
+- Added tier-based rate-limit selection using `req.clientTier`.
+
+#### Changed
+- Updated `src/app.js` so JWT verification runs before client identification and rate limiting.
+- Updated `src/middleware/identifyClient.js` to identify guests by IP and authenticated users by verified user ID.
+- Updated `src/middleware/rateLimiter.js` to select limits from the client's configured tier.
+- Corrected the premium tier configuration spelling.
+
+#### Security and Configuration
+- Configured JWT verification to accept HS256 tokens signed with the shared `JWT_SECRET`.
+- Required a valid user subject, an allowed tier, and an expiration claim.
+- Rejected invalid and expired tokens with HTTP 401 instead of silently treating them as guest requests.
+- Kept `.env` excluded from version control.
+
+#### Manual Testing
+- Confirmed guest requests receive a limit of 10 requests per 60-second window.
+- Confirmed authenticated free users receive a limit of 15 requests per 60-second window.
+- Confirmed authenticated premium users receive a limit of 25 requests per 60-second window.
+- Confirmed invalid tokens receive HTTP 401.
+- Confirmed expired tokens receive HTTP 401.
+
+#### Milestone Status
+**Completed:** JWT verification, authenticated client identification, and tier-based rate limiting have been manually tested.
+
+#### Next
+- Add automated tests for guest, authenticated, and invalid-token scenarios.
+- Test concurrent requests against the sliding-window implementation.
+- Review robustness, configuration validation, and deployment readiness.

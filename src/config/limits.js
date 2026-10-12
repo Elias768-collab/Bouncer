@@ -1,17 +1,17 @@
 export const rateLimits = {
-   
-    // Number of request that can be made by client 
+
+    // Maximum request allowed within the rolling time window
     guest: {
         requests: 10,
         window: 60
     },
-    
+
     free: {
         requests: 15,
         window: 60
     },
 
-    premuim: {
+    premium: {
         requests: 25,
         window: 60
     },

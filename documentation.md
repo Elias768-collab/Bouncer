@@ -14,18 +14,58 @@ The service uses Redis as its data store for tracking request activity.
 - dotenv — environment variable management
 - Git/GitHub — version control and project history
 
-## Client Identification
+## Client Identification and Authentication
 
-Bouncer currently identifies clients using their IP address.
+Bouncer supports guest and authenticated client identification through middleware.
 
-The `identifyClient` middleware creates a client key in the format:
+### Middleware Request Flow
+
+Requests to the protected root endpoint pass through the following middleware in order:
+
+1. `verifyToken` — checks an optional bearer JWT.
+2. `identifyClient` — assigns the client key and rate-limit tier.
+3. `rateLimiter` — applies the configured rate limit using the sliding-window algorithm.
+
+### Guest Clients
+
+Requests without an Authorization header continue as guests. The `identifyClient` middleware identifies a guest by IP address and creates a client key in this format:
 
 `ip:<IP address>`
 
-The key is attached to the Express request object as `req.clientKey` so that subsequent middleware can use it.
+The key is attached to the Express request as `req.clientKey`, and the client's tier is set to `guest`.
 
-Authentication-based identification using a user ID can be added later when JWT authentication is introduced.
+### Authenticated Clients
 
+Requests with a bearer token are verified by `src/middleware/verifyToken.js` using `jsonwebtoken` and the `JWT_SECRET` environment variable. Only the HS256 algorithm is accepted.
+
+The middleware checks the token signature and expiration, and requires:
+- A non-empty string `sub` claim identifying the user.
+- A `tier` claim equal to `free` or `premium`.
+- A numeric `exp` claim.
+
+After successful verification, the middleware attaches the verified user ID and tier to `req.user`.
+
+The `identifyClient` middleware then uses the verified user ID to create a key in this format:
+
+`user:<user ID>`
+
+The user's verified tier is assigned to `req.clientTier`. Invalid, expired, malformed, or otherwise unacceptable supplied tokens receive HTTP 401 instead of being treated as guest requests.
+
+### Configured Rate Limits
+
+Rate limits are defined in `src/config/limits.js`:
+
+| Tier | Requests | Window |
+|---|---:|---:|
+| Guest | 10 | 60 seconds |
+| Free | 15 | 60 seconds |
+| Premium | 25 | 60 seconds |
+
+The `rateLimiter` middleware selects the configuration using `req.clientTier`. Authenticated identity and tier values must come from the verified JWT, not from arbitrary request fields.
+
+### Authentication Scope
+
+Bouncer currently verifies JWTs issued using the configured shared secret. A separate authentication service or production token-issuing endpoint is not part of the current implementation. Locally generated development tokens are used to test authenticated tiers.
 ## Redis Connection
 
 Redis runs locally through Docker using the official Redis 7 Alpine image.
