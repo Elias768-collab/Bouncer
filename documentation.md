@@ -105,3 +105,50 @@ Lua is used so the check-and-record operation happens atomically inside Redis, p
 Rate-limit response headers are calculated from the sliding-window state. Retry-After is based on when the oldest request will expire rather than always returning the full window duration.
 
 The implementation was tested manually by sending requests to the protected endpoint. Ten requests were accepted, the eleventh was rejected with HTTP 429, and requests became available again as older requests left the sliding window.
+
+## Automated Testing
+
+Bouncer uses Node.js's built-in test runner and Supertest to test HTTP endpoints without manually starting the Express server for each test.
+
+### Running the Tests
+
+Start the Redis container before running the test suite:
+
+```bash
+docker compose up -d
+```
+
+Run the tests using a dedicated Redis database (`1`) so test cleanup does not clear the development database (`0`):
+
+```bash
+REDIS_URL=redis://localhost:6379/1 npm test
+```
+
+The test suite uses `node --test` and connects to Redis through the application's existing Redis client. It clears the selected test database before each test and closes the Redis connection after the suite finishes.
+
+**Important:** Database `1` is reserved for automated tests. Do not point the test suite at the development database.
+
+### Current Test Coverage
+
+The automated tests verify:
+
+1. Guest requests return the expected rate-limit headers.
+2. Guests are blocked after reaching the configured limit of 10 requests per 60 seconds.
+3. Requests containing an invalid JWT are rejected with HTTP `401`.
+4. Requests containing an expired JWT are rejected with HTTP `401`.
+5. Authenticated free-tier users receive a limit of 15 requests per 60 seconds.
+6. Authenticated premium-tier users receive a limit of 25 requests per 60 seconds.
+
+### Testing Tools
+
+- **Node.js test runner (`node:test`):** Runs the automated tests.
+- **Node.js assertions (`node:assert/strict`):** Checks response status codes, headers, and response bodies.
+- **Supertest:** Sends HTTP requests to the Express application during tests.
+- **jsonwebtoken:** Creates test JWTs for authentication scenarios.
+- **Redis:** Stores rate-limit data during testing.
+
+### Current Status and Limitations
+
+All six current automated tests pass.
+
+The suite covers basic guest rate limiting, JWT rejection, and tier-specific rate-limit headers. It does not yet fully test concurrent requests, sliding-window expiry over time, or every possible authentication and configuration failure.

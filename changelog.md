@@ -125,3 +125,14 @@
 - Add automated tests for guest, authenticated, and invalid-token scenarios.
 - Test concurrent requests against the sliding-window implementation.
 - Review robustness, configuration validation, and deployment readiness.
+
+## 2026-10-13 — Automated Testing
+
+- Added Supertest as a development dependency.
+- Configured the `npm test` script to use Node.js's built-in test runner.
+- Created `test/app.test.js` for automated HTTP endpoint testing.
+- Added six tests covering guest rate-limit headers, guest limit enforcement, invalid JWTs, expired JWTs, free-tier limits, and premium-tier limits.
+- Reserved Redis database `1` for automated tests to keep test cleanup separate from the development database.
+- Verified that all six tests pass.
+
+**Next:** Add concurrency and sliding-window expiry tests, then improve configuration validation and deployment readiness.
