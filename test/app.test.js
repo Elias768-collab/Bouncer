@@ -2,6 +2,7 @@ import test, { beforeEach, after } from "node:test";
 import assert from "node:assert/strict";
 import request from "supertest";
 import jwt from "jsonwebtoken";
+import { slidingWindow } from "../src/algorithms/slidingWindow.js";
 
 import app from "../src/app.js";
 import { redisClient } from "../src/redis/client.js";
@@ -120,4 +121,73 @@ test("premium-tier user receives the configured rate limit", async () => {
     assert.equal(response.headers["x-ratelimit-limit"], "25");
     assert.equal(response.headers["x-ratelimit-remaining"], "24");
     assert.match(response.body.clientKey, /^user:/);
+});
+
+test("concurrent guest requests never exceed the rate limit", async () => {
+    const totalRequests = 20;
+
+    // Send 20 requests without waiting for each one to finish.
+    const responses = await Promise.all(
+        Array.from(
+            { length: totalRequests },
+            () => request(app).get("/")
+        )
+    );
+
+    const successfulRequests = responses.filter(
+        (response) => response.status === 200
+    );
+
+    const rejectedRequests = responses.filter(
+        (response) => response.status === 429
+    );
+
+    // Only 10 requests should be allowed for a guest.
+    assert.equal(successfulRequests.length, 10);
+
+    // The remaining 10 requests should be rejected.
+    assert.equal(rejectedRequests.length, 10);
+});
+
+test("expired requests leave the sliding window", async () => {
+    const clientKey = `expiry-test-${Date.now()}`;
+    const limit = 2;
+    const window = 60;
+    const startTime = Math.floor(Date.now() / 1000);
+
+    // Fill the window with two requests.
+    const first = await slidingWindow(clientKey, limit, window);
+    const second = await slidingWindow(clientKey, limit, window);
+
+    assert.equal(first.allowed, true);
+    assert.equal(second.allowed, true);
+    assert.equal(second.requestCount, 2);
+
+    // A third request within the same window should be rejected.
+    const blocked = await slidingWindow(clientKey, limit, window);
+
+    assert.equal(blocked.allowed, false);
+    assert.equal(blocked.requestCount, 2);
+
+    // Move all existing request timestamps outside the window.
+    const redisKey = `rate-limit:${clientKey}`;
+
+    const storedRequests = await redisClient.zRange(redisKey, 0, -1);
+
+    await redisClient.zAdd(
+        redisKey,
+        storedRequests.map((value) => ({
+            score: startTime - window - 1,
+            value
+        }))
+    );
+
+    // The Lua script should remove the expired requests.
+    const afterExpiry = await slidingWindow(clientKey, limit, window);
+
+    assert.equal(afterExpiry.allowed, true);
+    assert.equal(afterExpiry.requestCount, 1);
+
+    // Clean up the test's Redis key.
+    await redisClient.del(redisKey);
 });
