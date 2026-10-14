@@ -66,11 +66,22 @@ The `rateLimiter` middleware selects the configuration using `req.clientTier`. A
 ### Authentication Scope
 
 Bouncer currently verifies JWTs issued using the configured shared secret. A separate authentication service or production token-issuing endpoint is not part of the current implementation. Locally generated development tokens are used to test authenticated tiers.
+
 ## Redis Connection
 
-Redis runs locally through Docker using the official Redis 7 Alpine image.
+### Redis Connection and Reconnection Handling
 
-The application connects to Redis through the `REDIS_URL` environment variable.
+Bouncer uses the Node.js Redis client to communicate with Redis, which stores the request history used by the sliding-window rate limiter.
+
+The Redis client is configured with a reconnection strategy to control what happens when a connection is interrupted:
+
+- **Retry limit:** Stops automatic reconnection when the retry counter reaches five.
+- **Progressive delay:** Increases the delay between reconnection attempts, up to a maximum of three seconds.
+- **Error logging:** Logs Redis client errors to the terminal to help with troubleshooting.
+
+The Redis client connects during module initialization. If Redis is unavailable during startup, the application may still fail to initialize successfully.
+
+**Testing status:** The existing automated test suite passes all eight tests after this change. Dedicated tests for Redis connection failure and recovery have not yet been added.
 
 The Redis client is initialized as a shared client in:
 

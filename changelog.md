@@ -136,3 +136,12 @@
 - Verified that all six tests pass.
 
 **Next:** Add concurrency and sliding-window expiry tests, then improve configuration validation and deployment readiness.
+
+## 2026-10-14 — Redis Reconnection Handling
+
+- Added a configurable Redis reconnection strategy.
+- Introduced progressive retry delays capped at three seconds.
+- Set a threshold to stop automatic reconnection attempts.
+- Improved Redis client error logging.
+- Verified that all eight existing automated tests pass.
+- Redis outage and recovery behavior remains to be tested directly.
