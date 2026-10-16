@@ -145,3 +145,15 @@
 - Improved Redis client error logging.
 - Verified that all eight existing automated tests pass.
 - Redis outage and recovery behavior remains to be tested directly.
+
+### 2026-10-16 — Reliability and Error Handling
+
+- Added environment-based configuration for guest, free, and premium rate limits and their time windows.
+- Added validation requiring configured values to be positive integers.
+- Adopted a fail-open policy for Redis rate-limit check failures.
+- Changed Redis connection startup to avoid blocking Express startup.
+- Configured automatic reconnection with a capped delay and disabled offline command queuing.
+- Added Redis error logging.
+- Updated the test setup to wait for Redis readiness before running Redis-dependent tests.
+- Verified Redis outage behaviour and recovery manually.
+- Verified automated tests: 9 passed, 0 failed.

@@ -52,7 +52,11 @@ export const rateLimiter = async (req, res, next) => {
 
         next();
     } catch (error) {
-        console.error("Rate limiter error:", error);
-        next(error);
+        console.error(
+            "Rate limiter check failed. Allowing request under fail-open policy:",
+            error.message
+        );
+
+        return next();
     }
 };

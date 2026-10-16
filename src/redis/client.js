@@ -7,23 +7,32 @@ import { createClient } from "redis";
 export const redisClient = createClient({
     url: process.env.REDIS_URL,
 
+    // Reject commands while Redis is disconnected instead of queuing them.
+    // This allows the rate limiter's fail-open handler to run promptly.
+    disableOfflineQueue: true,
+
+
     // Limit automatic reconnection attempts
     socket: {
         reconnectStrategy(retries) {
-            if(retries >=5 ) {
-                return new Error("Redis reconnection limit reached");
-            }
-
-            // Wait longer between attempts, up to 3 seconds
-            return Math.min(retries * 500, 3000);
-        }
+    // Keep retrying, but cap the delay at 3 seconds.
+    // This allows Bouncer to recover when Redis returns.
+    return Math.min(retries * 500, 3000);
+}
     }
 });
 
 // If an error is encountered 
 redisClient.on("error", (error) => {
-    console.log("Redis client error:", error.message);
+    const message = error?.message || "Unknown Redis connection error";
+    console.error(`[Redis] ${message}`);
 });
 
-
-await redisClient.connect();
+// Start connecting to Redis without blocking Express startup.
+// The client will continue reconnecting if Redis is temporarily unavailable.
+redisClient.connect().catch((error) => {
+    console.error(
+        "Initial Redis connection failed. Bouncer will continue in fail-open mode:",
+        error.message
+    );
+});

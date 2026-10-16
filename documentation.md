@@ -163,3 +163,39 @@ The automated tests verify:
 All six current automated tests pass.
 
 The suite covers basic guest rate limiting, JWT rejection, and tier-specific rate-limit headers. It does not yet fully test concurrent requests, sliding-window expiry over time, or every possible authentication and configuration failure.
+
+## Reliability and Error Handling
+
+### Redis Failure Policy: Fail-Open
+
+Bouncer uses a **fail-open** policy when Redis is unavailable. If the rate-limiting check fails, the middleware logs the error and allows the request to continue rather than making Redis downtime take down the API.
+
+**Trade-off:** Requests may temporarily bypass rate limiting during a Redis outage. This prioritizes API availability over strict enforcement during the outage.
+
+### Redis Connection and Recovery
+
+- Redis connection attempts run without blocking Express startup.
+- The Redis client retries connections with a delay capped at three seconds.
+- Offline commands are not queued, helping failed rate-limit checks return promptly.
+- When Redis becomes available again, Bouncer can resume normal rate-limit enforcement.
+
+### Configuration Validation
+
+Rate limits and windows are configurable through environment variables:
+
+| Variable | Default |
+|---|---:|
+| `GUEST_RATE_LIMIT` | 10 |
+| `GUEST_RATE_WINDOW_SECONDS` | 60 |
+| `FREE_RATE_LIMIT` | 15 |
+| `FREE_RATE_WINDOW_SECONDS` | 60 |
+| `PREMIUM_RATE_LIMIT` | 25 |
+| `PREMIUM_RATE_WINDOW_SECONDS` | 60 |
+
+Values must be positive integers. Invalid values cause configuration loading to fail with an explanatory error.
+
+### Verification
+
+The automated test suite currently passes all nine tests, covering rate-limit headers, blocking, JWT validation, tier limits, concurrent requests, sliding-window expiry, and simulated Redis failure.
+
+Manual outage testing confirmed that the API returned `200 OK` while Redis was stopped and resumed returning rate-limit headers after Redis restarted.

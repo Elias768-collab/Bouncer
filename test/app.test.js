@@ -1,4 +1,4 @@
-import test, { beforeEach, after } from "node:test";
+import test, { before, beforeEach, after } from "node:test";
 import assert from "node:assert/strict";
 import request from "supertest";
 import jwt from "jsonwebtoken";
@@ -6,6 +6,27 @@ import { slidingWindow } from "../src/algorithms/slidingWindow.js";
 
 import app from "../src/app.js";
 import { redisClient } from "../src/redis/client.js";
+
+before(async () => {
+    // Wait for Redis to connect before running Redis-dependent tests.
+    if (redisClient.isReady) {
+        return;
+    }
+
+    await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            redisClient.off("ready", onReady);
+            reject(new Error("Redis did not become ready within 10 seconds."));
+        }, 10_000);
+
+        const onReady = () => {
+            clearTimeout(timeout);
+            resolve();
+        };
+
+        redisClient.once("ready", onReady);
+    });
+});
 
 
 beforeEach(async () => {
@@ -190,4 +211,31 @@ test("expired requests leave the sliding window", async () => {
 
     // Clean up the test's Redis key.
     await redisClient.del(redisKey);
+});
+
+
+test("request is allowed when the Redis rate-limit check fails", async () => {
+    // Save the real Redis method so we can restore it after the test.
+    const originalEval = redisClient.eval;
+    const originalConsoleError = console.error;
+
+    try {
+        // Simulate Redis failing during the rate-limit check.
+        redisClient.eval = async () => {
+            throw new Error("Simulated Redis failure");
+        };
+
+        // Silence the expected error log during this test.
+        console.error = () => {};
+
+        const response = await request(app).get("/");
+
+        // Fail-open means the request should still reach the route.
+        assert.equal(response.status, 200);
+        assert.equal(response.body.message, "Bouncer API is running");
+    } finally {
+        // Restore both methods so other tests are unaffected.
+        redisClient.eval = originalEval;
+        console.error = originalConsoleError;
+    }
 });
