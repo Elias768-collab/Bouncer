@@ -199,3 +199,33 @@ Values must be positive integers. Invalid values cause configuration loading to 
 The automated test suite currently passes all nine tests, covering rate-limit headers, blocking, JWT validation, tier limits, concurrent requests, sliding-window expiry, and simulated Redis failure.
 
 Manual outage testing confirmed that the API returned `200 OK` while Redis was stopped and resumed returning rate-limit headers after Redis restarted.
+
+## Production Deployment and Verification
+
+**Production URL:** https://bouncer-v8la.onrender.com/
+
+Bouncer is deployed on Render and uses hosted Redis for rate-limit state.
+
+### Guest Rate Limit
+- Limit: 10 requests
+- Window: 60 seconds
+- Allowed requests return HTTP 200.
+- Requests exceeding the limit return HTTP 429 Too Many Requests.
+
+### Rate-Limit Headers
+- `X-RateLimit-Limit`: Maximum requests permitted in the window.
+- `X-RateLimit-Remaining`: Requests remaining in the current window.
+- `X-RateLimit-Reset`: Unix timestamp indicating the window reset time.
+- `Retry-After`: Approximate number of seconds the client should wait before retrying after being rate-limited.
+
+### Live Verification
+The deployed service was tested using `curl`.
+
+Verified results:
+1. The public endpoint returned HTTP 200.
+2. Ten requests were accepted within a fresh guest window.
+3. Subsequent requests returned HTTP 429.
+4. The blocked response included `Retry-After` and the rate-limit headers.
+5. Requests were accepted again after the previous window expired.
+
+The live checks verify deployment, rate-limit enforcement, reset behavior, and response headers. Automated concurrency tests are used separately to check that simultaneous requests do not bypass the configured limit.

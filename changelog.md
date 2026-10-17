@@ -157,3 +157,29 @@
 - Updated the test setup to wait for Redis readiness before running Redis-dependent tests.
 - Verified Redis outage behaviour and recovery manually.
 - Verified automated tests: 9 passed, 0 failed.
+
+## 2026-10-18 — Render Deployment and Live QA
+
+### Added
+- Deployed Bouncer API to Render: https://bouncer-v8la.onrender.com/
+- Configured hosted Redis and production environment variables.
+- Made the service accessible through a public HTTPS endpoint.
+
+### Testing
+- Confirmed the deployed endpoint returns HTTP 200.
+- Verified the guest limit of 10 requests per 60-second window.
+- Confirmed requests beyond the limit return HTTP 429.
+- Verified `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers.
+- Confirmed `Retry-After` is included in the rate-limit response.
+- Verified that requests are accepted again after the rate-limit window expires.
+- Confirmed client identification uses the observed public client IP behind Render's proxy.
+
+### Milestone Status
+- Public deployment: Passed
+- Live rate-limit enforcement: Passed
+- Reset behavior: Passed
+- Rate-limit response headers: Passed
+
+### Remaining
+- Complete final QA and review proxy trust configuration.
+- Run the final local test suite and confirm the repository is clean.
