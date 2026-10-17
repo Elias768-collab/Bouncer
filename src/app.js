@@ -14,13 +14,7 @@ app.set("trust proxy", 3);
 app.get("/", verifyToken, identifyClient, rateLimiter, (req, res) => {
     res.json({
         message: "Bouncer API is running",
-        clientKey: req.clientKey,
-        debug: {
-            ip: req.ip,
-            ips: req.ips,
-            remoteAddress: req.socket.remoteAddress,
-            forwardedFor: req.headers["x-forwarded-for"]
-        }
+        clientKey: req.clientKey
     });
 });
 
