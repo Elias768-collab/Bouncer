@@ -8,7 +8,7 @@ import { rateLimiter } from "./middleware/rateLimiter.js";
 // Creating express application instance
 const app = express();
 
-// Trust the single proxy in front of the Render web service
+// Trust the three proxy in front of the Render web service
 app.set("trust proxy", 3);
 
 app.get("/", verifyToken, identifyClient, rateLimiter, (req, res) => {
